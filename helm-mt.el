@@ -121,26 +121,29 @@ The order of the modes controls which is the default action in the helm-mt UI." 
 
 (defun helm-mt/term-source-terminals ()
   "List all terminals or shells and allow various actions on them."
-  `((name . "Terminal buffers")
-    (keymap . ,helm-mt/keymap)
-    (candidates . (lambda () (or
-                              (helm-mt/terminal-buffers)
-                              (list ""))))
-    (action . (("Switch to terminal buffer" . (lambda (candidate)
-                                                `(,(switch-to-buffer candidate)) ))
-               ("Exit marked terminals" . (lambda (candidate)
-                                            `(,(helm-mt/delete-marked-terms candidate))))))))
+  (helm-build-sync-source "Terminal buffers"
+    :keymap helm-mt/keymap
+    :candidates (lambda () (or
+                            (helm-mt/terminal-buffers)
+                            (list "")))
+    :action  (helm-make-actions
+              "Switch to terminal buffer"
+              (lambda (candidate)
+                (switch-to-buffer candidate))
+              "Exit marked terminals"
+              (lambda (candidate)
+                (helm-mt/delete-marked-terms candidate)))))
 
 (defun helm-mt/term-source-terminal-not-found ()
   "Create an helm-mt source for when a terminal needs to be created."
-  `((name . "Launch a new terminal")
-    (dummy)
-    (keymap . ,helm-mt/keymap)
-	(action . ,(mapcar (lambda (mode)
-						  `(,(format "Launch new %s" mode) .
-							(lambda (candidate)
-								(helm-mt/launch-term candidate (quote ,mode)))))
-					  helm-mt/all-terminal-modes))))
+  (helm-build-dummy-source "Launch a new terminal"
+    :keymap helm-mt/keymap
+    :action (apply 'helm-make-actions
+                   (apply 'append (mapcar (lambda (mode)
+                                            (list (format "Launch new %s" mode)
+                                                  (lambda (candidate)
+                                                    (helm-mt/launch-term candidate mode))))
+                                          helm-mt/all-terminal-modes)))))
 
 (defun helm-mt/shell-advice (orig-fun &rest args)
   "Advice that has helm-mt run when invoking `M-x shell` or `M-x term`.
@@ -178,7 +181,6 @@ If ONOFF is t, activate the advice and if nil, remove it."
 		 `(,(helm-mt/term-source-terminals)
 		   ,(helm-mt/term-source-terminal-not-found))))
     (helm :sources sources
-          ;:input (helm-mt/dir-name)
           :buffer "*helm-mt*")))
 
 (provide 'helm-mt)
